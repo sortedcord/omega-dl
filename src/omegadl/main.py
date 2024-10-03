@@ -3,11 +3,15 @@ import os
 from fetch import load_store
 from pathlib import Path
 from downloader import download_chapter, zip_chapter
+import getopt
+import sys
 
-# TODO: Download series image
+# TODO: Fix up output location configurations.
 # TODO: Add comicInfo.xml stuff
 # TODO: Pack chapters as soon as they are downloaded
 # TODO: Add comic_store updating functions
+# TODO: Use a logger
+# TODO: Make cache optional
 
 def view_comic(comic_dict):
     os.system("clear")
@@ -85,12 +89,48 @@ def search(store):
     else:
         return
 
-            
+def setup_args() -> dict:
+    argumentList = sys.argv[1:]
+    # Options
+    options = "ho:"
+
+    # Long options
+    long_options = ["Help", "output="]
+    output_location = ""
+
+    try:
+        # Parsing argument
+        arguments, values = getopt.getopt(argumentList, options, long_options)
+        
+        # checking each argument
+        for currentArgument, currentValue in arguments:
+
+            if currentArgument in ("-h", "--Help"):
+                print ("Displaying Help")
+                print("-o | --Output | Set the output location for the resulting files created by omega-dl. The program creates a folder 'mdlout' in the directory specified.")
+            elif currentArgument in ("-o", "--Output"):
+                if os.path.exists(currentValue):
+                    print (("[omegadl] Set output location to (% s)") % (currentValue))
+                    output_location = Path(currentValue) / "mdlout"
+                    os.makedirs(output_location, exist_ok=True)
+                else:
+                    print("[omegadl] Could not access ", currentValue)
+                    exit()
+        if output_location == "":
+            print("[omegadl] Output location not specified. Exiting...")
+            exit()
+
+                
+    except getopt.error as err:
+        # output error, and return with an error code
+        print (str(err))     
+
+    return output_location
 
 
 def main():
-    print("[Omegadl] Loading store from mdlout/master.json")
-    store = load_store()
+    output_dir = setup_args()
+    store = load_store(output_dir)
     print("[Omegadl] Store loaded successfully")
 
     while True:

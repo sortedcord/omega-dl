@@ -50,7 +50,8 @@ def generate_random_headers():
     }
 
 
-def _fetch(search_url:str, dump:bool=True, dump_dir=Path("mdlout/cache/requests/")) -> dict:
+def _fetch(search_url:str, dump:bool, output_dir:Path=None) -> dict:
+    dump_dir = output_dir / "cache" / "requests"
     resp = None
     sc = 0
 
@@ -85,18 +86,18 @@ def _fetch(search_url:str, dump:bool=True, dump_dir=Path("mdlout/cache/requests/
     return response_dict
 
 
-def pages(comic_dict:dict, chapter_dict:dict):
+def pages(comic_dict:dict, chapter_dict:dict, output_dir:Path=None):
     print(f"Fetching {comic_dict['name']} - {chapter_dict['name']}")
     try:
-        resp = _fetch(f"https://api.omegascans.org/chapter/{comic_dict['slug']}/{chapter_dict["slug"]}")
+        resp = _fetch(f"https://api.omegascans.org/chapter/{comic_dict['slug']}/{chapter_dict["slug"]}", dump=True, output_dir=output_dir)
         chapter_dict["data"] = resp["chapter"]["chapter_data"]["images"]
     except KeyError:
         chapter_dict["data"]= []
 
     return chapter_dict
 
-def chapters(comic_dict:dict):
-    resp = _fetch(f"https://api.omegascans.org/chapter/query?page=1&perPage=1999&series_id={comic_dict['id']}")["data"]
+def chapters(comic_dict:dict, output_dir:Path=None):
+    resp = _fetch(f"https://api.omegascans.org/chapter/query?page=1&perPage=1999&series_id={comic_dict['id']}", dump=True, output_dir=output_dir)["data"]
     
     comic_dict["chapters"] = []
     for i in resp:
@@ -106,13 +107,13 @@ def chapters(comic_dict:dict):
             "thumbnail_url": i["chapter_thumbnail"],
             "slug": i["chapter_slug"]
         }
-        chapter_dict = pages(comic_dict, chapter_dict)
+        chapter_dict = pages(comic_dict, chapter_dict, output_dir)
 
         comic_dict['chapters'].append(chapter_dict)
     return comic_dict
 
 
-def update_comics_data(response_dict: dict):
+def update_comics_data(output_dir:Path, response_dict: dict):
     fetched_data = {
             "meta": {
                 "fetched":str(datetime.datetime.now())
@@ -133,16 +134,16 @@ def update_comics_data(response_dict: dict):
                 "chapters":[]
             }
         
-        comic_dict = chapters(comic_dict)
+        comic_dict = chapters(comic_dict, output_dir)
         
         fetched_data["data"].append(comic_dict)
     
     # dump master.json
-    with open(Path("mdlout")/"master.json", "w") as f:
+    with open(output_dir / "master.json", "w") as f:
         f.write(json.dumps(fetched_data, indent=2))
 
 
-def comics(query:str=None):
+def comics(output_dir:Path, query:str=None):
     current_page = 1
     last_page = 100
     search_url = f"https://api.omegascans.org/query?adult=true"
@@ -153,7 +154,7 @@ def comics(query:str=None):
     search_url += "&page=1"
     
     while current_page<=last_page:
-        response = _fetch(search_url)
+        response = _fetch(search_url, dump=True, output_dir=output_dir)
         data.extend(response["data"])
 
         if current_page==1:
@@ -166,15 +167,25 @@ def comics(query:str=None):
         search_url= search_url.split("page=")[0] + f"page={current_page}"
     
     if query is None:
-        update_comics_data(data)
+        update_comics_data(output_dir, data)
         
 
-def load_store() -> dict:
+def load_store(output_dir:Path) -> dict:
+    master_json_path = output_dir / "master.json"
+    print("[omegadl] Loading comic store from ", master_json_path)
     try:
-        with open("mdlout/master.json", "r") as f:
+        with open(master_json_path, "r") as f:
             comic_store = json.loads(f.read())["data"]
-    except Exception as e:
-        print(e)
-        quit()
+    except FileNotFoundError:
+        print("[omegadl] Could not find store at ", master_json_path)
+        print("[omegadl] Generating the store file can take extremely long and can get your network whitelisted from the servers due to the large number of requests made.")
+
+        _ = input("Would you like to generate one anyway (y/n): ")
+        if _=="y":
+            comics(output_dir)
+            comic_store = load_store(output_dir)
+        else:
+            print("[omegadl] Exiting...")
+            exit()
     return comic_store
 

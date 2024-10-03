@@ -13,7 +13,7 @@ def zip_chapter(input_dir, output_dir, comic, chapter):
     zip_files(files,output )
 
 
-
+# TODO: Download series image
 def download(url, output_dir):
     r = requests.get(url)
     with open(output_dir / url.split('/')[-1].split('?')[0], "wb") as f:
