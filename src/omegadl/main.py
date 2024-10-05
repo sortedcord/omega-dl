@@ -1,10 +1,12 @@
-import time
 import os
 from fetch import load_store
 from pathlib import Path
 from downloader import download_chapter, zip_chapter
 import getopt
 import sys
+from rich.console import Console
+
+console = Console()
 
 # TODO: Fix up output location configurations.
 # TODO: Add comicInfo.xml stuff
@@ -12,6 +14,16 @@ import sys
 # TODO: Add comic_store updating functions
 # TODO: Use a logger
 # TODO: Make cache optional
+
+
+def view_catalog():
+    os.system("clear")
+    print("Catalog json at: ")
+    print("Last Updated at: ")
+
+
+    
+
 
 def view_comic(comic_dict):
     os.system("clear")
@@ -110,39 +122,44 @@ def setup_args() -> dict:
                 print("-o | --Output | Set the output location for the resulting files created by omega-dl. The program creates a folder 'mdlout' in the directory specified.")
             elif currentArgument in ("-o", "--Output"):
                 if os.path.exists(currentValue):
-                    print (("[omegadl] Set output location to (% s)") % (currentValue))
+                    console.log(("Set output location to (% s)") % (currentValue))
                     output_location = Path(currentValue) / "mdlout"
                     os.makedirs(output_location, exist_ok=True)
                 else:
-                    print("[omegadl] Could not access ", currentValue)
+                    console.log(f"Could not access {currentValue}")
                     exit()
         if output_location == "":
-            print("[omegadl] Output location not specified. Exiting...")
+            console.log("Output location not specified. Exiting...")
             exit()
 
                 
     except getopt.error as err:
         # output error, and return with an error code
-        print (str(err))     
+        print (str(err)) 
+        quit()    
 
     return output_location
 
 
 def main():
     output_dir = setup_args()
+    console.log(f"Loading comic store from {output_dir}")
     store = load_store(output_dir)
-    print("[Omegadl] Store loaded successfully")
+    console.log(f"Store loaded {len(store)} comics successfully")
 
     while True:
         print("\n\nOmega Downloader 0.1\n")
         print("1. Search Comics")
-        print("2. Quit")
+        print("2. Comic Catalog")
+        print("3. Quit")
         
         choice = int(input("\nEnter your choice: "))
 
         if choice==1:
             search(store)
         elif choice==2:
+            view_catalog()
+        else:
             quit()
 
 main()

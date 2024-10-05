@@ -5,6 +5,7 @@ import datetime
 import os
 from utils import slugify
 from pathlib import Path
+from store import get_comic_by_name
 
 def read_cookies() -> dict:
     try:
@@ -143,6 +144,155 @@ def update_comics_data(output_dir:Path, response_dict: dict):
         f.write(json.dumps(fetched_data, indent=2))
 
 
+def get_chapter_pages(output_dir:Path, comic:dict, chapter:dict) -> list:
+    """
+    Get all image urls of pages of a particular chapter of a comic.
+    #   output_dir: Ouput Directory
+    #   comic: 
+    #   chapter:
+    """
+
+    request_url = f"https://api.omegascans.org/chapter/{comic['slug']}/{chapter["slug"]}"
+    reponse = _fetch(request_url, dump=True, output_dir=output_dir)
+
+    return reponse["chapter"]["chapter_data"]["images"]
+
+
+def get_comic_list(output_dir:Path) -> list:
+    """
+    Get all the comics along with their basic metadata from omegascans.
+    output_dir: Pass in the output directory for omegadl
+    """
+
+    current_page = 1
+    last_page = 100
+    search_url = f"https://api.omegascans.org/query?adult=true"
+    data = []
+    
+    while current_page<=last_page:
+        response = _fetch(search_url, dump=True, output_dir=output_dir)
+        data.extend(response["data"])
+
+        if current_page==1:
+            print("Total comics found: ", response["meta"]["total"])
+            last_page = int(response["meta"]["last_page"])
+        else:
+            print("Fetched page ", current_page) 
+
+        current_page +=1
+        search_url= search_url.split("page=")[0] + f"page={current_page}"
+    
+    comic_list = []
+    
+    for i in data:
+        if i["series_type"] != "Comic":
+            continue
+        comic_dict = {
+                "name": i["title"],
+                "id": i["id"],
+                "slug": i["series_slug"],
+                "thumbnail_url":i["thumbnail"],
+                "status":i["status"].lower(),
+                "created_at": i["created_at"],
+                "updated_at": i["updated_at"],
+                "chapters":[]
+            }
+        
+        comic_dict = chapters(comic_dict, output_dir)
+        
+        comic_list.append(comic_dict)
+    
+    return comic_list
+
+
+def get_chapter_list(output_dir:Path, comic:dict) -> list:
+    """
+    Returns the list of chapters for a given comic
+    #   output_dir: Location of the output directory
+    #   comic: The comic dictionary object 
+    """
+
+    request_url = f"https://api.omegascans.org/chapter/query?page=1&perPage=1999&series_id={comic['id']}"
+    response: list = _fetch(request_url, dump=True, output_dir=output_dir)["data"]
+    
+    chapter_list = []
+    for i in response:
+        chapter_list.append({
+            "id": i["id"],
+            "name": i["chapter_name"],
+            "thumbnail_url": i["chapter_thumbnail"],
+            "slug": i["chapter_slug"]
+        })
+    
+    return chapter_list
+
+
+def get_chapters(output_dir:Path, comic:dict, update:bool) -> list:
+    
+    chapter_list = get_chapter_list(output_dir, comic)
+    page_fetch_queue = []
+    if update:
+        for remote_chapter in chapter_list:
+            for local_chapter in comic["chapters"]:
+                if remote_chapter["slug"] != local_chapter["slug"]:
+                    page_fetch_queue.append(remote_chapter)
+    else:
+        page_fetch_queue = chapter_list
+    
+    ordered_chapter_list = []
+    
+    for chapter in remote_chapter:
+        if chapter in page_fetch_queue:
+            pages = get_chapter_pages(output_dir, comic, chapter)
+            chapter["data"] = pages
+            ordered_chapter_list.append(chapter)
+        else:
+            for i in comic["chapters"]:
+                if remote_chapter["slug"] == i["slug"]:
+                    ordered_chapter_list.append(i)
+
+    return ordered_chapter_list
+
+
+def get_catalog(output_dir:Path):
+    """
+    Creates a catalog by fetching data from omegascans.
+    Updates the catalog if output_dir contains 'catalog.json'
+    output_dir: Pass in the output directory for omegadl
+    """
+
+    remote = None
+    origin = None
+
+    if os.path.exists(output_dir / "catalog.json"):
+        update = True
+    else:
+        update = False
+    
+    remote = get_comic_list(output_dir)
+
+    if update:
+        origin = load_store(output_dir)
+        new_list = []
+        update_list = []
+
+        # Compare Titles and Update
+        for remote_comic in remote:
+            local_comic = get_comic_by_name(origin, remote_comic["title"])
+
+            if local_comic is None:
+                new_list.append(remote_comic)
+                continue
+
+            if local_comic["status"].lower() == "ongoing" and remote_comic["status"].lower() == "ongoing":
+                update_list.append(remote_comic)
+
+            elif local_comic["status"].lower() == "ongoing" and remote_comic["status"].lower() != "ongoing":
+                update_list.append(remote_comic)
+        
+        remote = new_list
+
+
 def comics(output_dir:Path, query:str=None):
     current_page = 1
     last_page = 100
@@ -172,20 +322,9 @@ def comics(output_dir:Path, query:str=None):
 
 def load_store(output_dir:Path) -> dict:
     master_json_path = output_dir / "master.json"
-    print("[omegadl] Loading comic store from ", master_json_path)
-    try:
-        with open(master_json_path, "r") as f:
-            comic_store = json.loads(f.read())["data"]
-    except FileNotFoundError:
-        print("[omegadl] Could not find store at ", master_json_path)
-        print("[omegadl] Generating the store file can take extremely long and can get your network whitelisted from the servers due to the large number of requests made.")
+    
+    with open(master_json_path, "r") as f:
+        comic_store = json.loads(f.read())["data"]
 
-        _ = input("Would you like to generate one anyway (y/n): ")
-        if _=="y":
-            comics(output_dir)
-            comic_store = load_store(output_dir)
-        else:
-            print("[omegadl] Exiting...")
-            exit()
     return comic_store
 
