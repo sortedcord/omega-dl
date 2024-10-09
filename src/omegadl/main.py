@@ -1,37 +1,47 @@
 import os
-from fetch import load_store
+from fetch import load_store, get_catalog
 from pathlib import Path
 from downloader import download_chapter, zip_chapter
 import getopt
 import sys
-from rich.console import Console
+import logging
+from rich.logging import RichHandler
 
-console = Console()
+
+FORMAT = "%(message)s"
+logging.basicConfig(
+    level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+)
+log = logging.getLogger("rich")
+
 
 # TODO: Fix up output location configurations.
 # TODO: Add comicInfo.xml stuff
 # TODO: Pack chapters as soon as they are downloaded
-# TODO: Add comic_store updating functions
 # TODO: Use a logger
 # TODO: Make cache optional
 
 
-def view_catalog():
+def view_catalog(catalog_data:dict, output_dir:Path):
     os.system("clear")
-    print("Catalog json at: ")
-    print("Last Updated at: ")
+    print(f"Catalog json at: {output_dir}/catalog.json")
+    print(f"Last Updated at: {catalog_data['meta']['fetched']}")
 
+    choice = input("Would you like to update catalog (y/n): ")
+    if choice == "y":
+        log.info("Updating catalog...")
+        get_catalog(output_dir, update=True)
+        log.info("Done Updating catalog...")
 
-    
 
 
 def view_comic(comic_dict):
     os.system("clear")
-    print("Selected comic: ", comic_dict["name"])
+    print("Selected comic: ", comic_dict['name'])
 
     print("\nCreated at: ", comic_dict['created_at'])
     print("Updated at: ", comic_dict['updated_at'])
-    print("Total Chapters: ", len(comic_dict["chapters"]))
+    print("Total Chapters: ", len(comic_dict['chapters']))
     print("\n1. View Chapters")
     print("2. Go Back")
 
@@ -41,21 +51,21 @@ def view_comic(comic_dict):
         return
     
     os.system("clear")
-    print("Selected comic: ", comic_dict["name"])
-    print(f"Location: mdlout/comics/{comic_dict["slug"]}")
+    print("Selected comic: ", comic_dict['name'])
+    print(f"Location: mdlout/comics/{comic_dict['slug']}")
 
     try:
-        files = os.listdir(f"mdlout/comics/{comic_dict["slug"]}/")
+        files = os.listdir(f"mdlout/comics/{comic_dict['slug']}/")
     except FileNotFoundError:
-        os.makedirs(f"mdlout/comics/{comic_dict["slug"]}/", exist_ok=True)
+        os.makedirs(f"mdlout/comics/{comic_dict['slug']}/", exist_ok=True)
         files = []
     missing_chapters = []
-    for chapter in comic_dict["chapters"]:
-        if chapter["slug"] in files:            
-            print(f"{chapter["slug"]} ............. Downloaded")
+    for chapter in comic_dict['chapters']:
+        if chapter['slug'] in files:            
+            print(f"{chapter['slug']} ............. Downloaded")
         else:
             missing_chapters.append(chapter)
-            print(f"{chapter["slug"]} ............. Not Downloaded")
+            print(f"{chapter['slug']} ............. Not Downloaded")
 
     print("\n1. Download Missing")
     print("2. Zip Chapters")
@@ -66,15 +76,15 @@ def view_comic(comic_dict):
 
     if choice == 1:
         for chapter in missing_chapters:
-            print(f"Downloading Chapter {chapter["name"]}")
+            print(f"Downloading Chapter {chapter['name']}")
             download_chapter(comic_dict, chapter)
     if choice == 2:
         in_c = input("Enter chapter you want to zip (chapter-slug): ")
-        for i in comic_dict["chapters"]:
-            if i["slug"] == in_c:
+        for i in comic_dict['chapters']:
+            if i['slug'] == in_c:
                 chapter = i
-        os.makedirs(f"{comic_dict["name"]}",exist_ok=True)
-        zip_chapter(Path(f"mdlout/comics/{comic_dict['slug']}/{in_c}"), Path(f"{comic_dict["name"]}"), comic_dict, chapter)
+        os.makedirs(f"{comic_dict['name']}",exist_ok=True)
+        zip_chapter(Path(f"mdlout/comics/{comic_dict['slug']}/{in_c}"), Path(f"{comic_dict['name']}"), comic_dict, chapter)
 
     else:
         return
@@ -86,9 +96,9 @@ def search(store):
 
     sel_comic = None
     for comic in store:
-        _s_title = comic["name"].lower().replace(" ", "")
+        _s_title = comic['name'].lower().replace(" ", "")
         if name_q in _s_title or name_q in _s_title:
-            print("Found match: ", comic["name"])
+            print("Found match: ", comic['name'])
             sel_comic = comic
             break
     if sel_comic is None:
@@ -107,7 +117,7 @@ def setup_args() -> dict:
     options = "ho:"
 
     # Long options
-    long_options = ["Help", "output="]
+    long_options = ['Help", "output=']
     output_location = ""
 
     try:
@@ -122,14 +132,14 @@ def setup_args() -> dict:
                 print("-o | --Output | Set the output location for the resulting files created by omega-dl. The program creates a folder 'mdlout' in the directory specified.")
             elif currentArgument in ("-o", "--Output"):
                 if os.path.exists(currentValue):
-                    console.log(("Set output location to (% s)") % (currentValue))
+                    log.info(("Set output location to (% s)") % (currentValue))
                     output_location = Path(currentValue) / "mdlout"
                     os.makedirs(output_location, exist_ok=True)
                 else:
-                    console.log(f"Could not access {currentValue}")
+                    log.info(f"Could not access {currentValue}")
                     exit()
         if output_location == "":
-            console.log("Output location not specified. Exiting...")
+            log.info("Output location not specified. Exiting...")
             exit()
 
                 
@@ -143,9 +153,9 @@ def setup_args() -> dict:
 
 def main():
     output_dir = setup_args()
-    console.log(f"Loading comic store from {output_dir}")
-    store = load_store(output_dir)
-    console.log(f"Store loaded {len(store)} comics successfully")
+    log.info(f"Loading comic store from {output_dir}")
+    catalog_data = load_store(output_dir)
+    log.info(f"Store loaded {len(catalog_data['data'])} comics successfully")
 
     while True:
         print("\n\nOmega Downloader 0.1\n")
@@ -156,9 +166,9 @@ def main():
         choice = int(input("\nEnter your choice: "))
 
         if choice==1:
-            search(store)
+            search(catalog_data["data"])
         elif choice==2:
-            view_catalog()
+            view_catalog(catalog_data, output_dir)
         else:
             quit()
 

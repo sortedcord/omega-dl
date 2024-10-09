@@ -12,6 +12,9 @@ def get_comic_by_name(catalog:list, query:str) -> dict:
     """
     Search comics by name
     """
+    query = query.lower().replace(" ", "")
+
+    # TODO: Improve name matching.
     for comic in catalog:
         _s_title = comic["name"].lower().replace(" ", "")
 

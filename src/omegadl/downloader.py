@@ -7,7 +7,7 @@ from utils import zip_files, list_files_abs
 
 def zip_chapter(input_dir, output_dir, comic, chapter):
     files = list_files_abs(input_dir)
-    output = output_dir / f"{comic["name"]} Vol.01 Ch.{chapter['slug'].split('-')[1]}.cbz"
+    output = output_dir / f"{comic['name']} Vol.01 Ch.{chapter['slug'].split('-')[1]}.cbz"
     if os.path.exists(output):
         os.remove(output)
     zip_files(files,output )
@@ -20,9 +20,9 @@ def download(url, output_dir):
         f.write(r.content)
 
 def download_chapter(comic:dict, chapter:dict):
-    out = Path("mdlout")/ "comics" / comic["slug"] / chapter["slug"]
+    out = Path("mdlout")/ "comics" / comic['slug'] / chapter['slug']
     os.makedirs(out, exist_ok=True)
-    urls = chapter["data"]
+    urls = chapter['data']
     for url in urls:
         print("Downloading ", url)
         download(url, out)
