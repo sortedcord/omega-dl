@@ -1,11 +1,13 @@
 import os
-from fetch import load_store, get_catalog
-from pathlib import Path
-from downloader import download_chapter, zip_chapter
-import getopt
 import sys
+from pathlib import Path
+import getopt
 import logging
 from rich.logging import RichHandler
+
+from fetch import load_store, get_catalog
+from downloader import download_chapter, zip_chapter
+from catalog import load_catalog
 
 
 FORMAT = "%(message)s"
@@ -15,11 +17,10 @@ logging.basicConfig(
 log = logging.getLogger("rich")
 
 
-# TODO: Fix up output location configurations.
 # TODO: Add comicInfo.xml stuff
-# TODO: Pack chapters as soon as they are downloaded
 # TODO: Use a logger
 # TODO: Make cache optional
+# TODO: Use a proper CLI framework
 
 
 def view_catalog(catalog_data:dict, output_dir:Path):
@@ -69,22 +70,34 @@ def view_comic(comic_dict):
 
     print("\n1. Download Missing")
     print("2. Zip Chapters")
-    print("3. Download Specific Chapters")
-    print("4. Go Back")
+    print("3. Download Specific Chapter")
+    print("4. Zip all Chapters")
+    print("5. Go Back")
 
     choice = int(input("\nEnter your choice: "))
 
     if choice == 1:
         for chapter in missing_chapters:
-            print(f"Downloading Chapter {chapter['name']}")
+            print(f"Downloading {chapter['name']}")
             download_chapter(comic_dict, chapter)
     if choice == 2:
         in_c = input("Enter chapter you want to zip (chapter-slug): ")
         for i in comic_dict['chapters']:
             if i['slug'] == in_c:
                 chapter = i
-        os.makedirs(f"{comic_dict['name']}",exist_ok=True)
+        os.makedirs(f"/data/manga/omega/{comic_dict['name']}",exist_ok=True)
         zip_chapter(Path(f"mdlout/comics/{comic_dict['slug']}/{in_c}"), Path(f"{comic_dict['name']}"), comic_dict, chapter)
+    if choice == 3:
+        chapter_slug = input("Enter the chapter slug u want to download: ")
+        for chapter in comic_dict['chapters']:
+            if chapter['slug'] == chapter_slug:
+                download_chapter(comic_dict, chapter)
+                break
+    if choice==4:
+        for chapter in comic_dict["chapters"]:
+            os.makedirs(f"/data/manga/omega/{comic_dict['name']}",exist_ok=True)
+            zip_chapter(Path(f"mdlout/comics/{comic_dict['slug']}/{chapter['slug']}"), Path(f"{comic_dict['name']}"), comic_dict, chapter)
+
 
     else:
         return
@@ -154,7 +167,7 @@ def setup_args() -> dict:
 def main():
     output_dir = setup_args()
     log.info(f"Loading comic store from {output_dir}")
-    catalog_data = load_store(output_dir)
+    catalog_data,_ = load_store(output_dir)
     log.info(f"Store loaded {len(catalog_data['data'])} comics successfully")
 
     while True:
