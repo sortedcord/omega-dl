@@ -97,6 +97,8 @@ def generate(ctx, skip_overwrite:bool=False):
         for comic in comic_list:
             progress.update(fetch_comics_task, description=f"[red]Downloading {comic.name}...")
             comic.chapters = get_chapters(output, comic, update=False)
+            if comic.volume_breakpoints == {}:
+                comic.volume_breakpoints = {comic.chapters[-1].slug: "1"}
             comics.append(comic)
             progress.update(fetch_comics_task, advance=1)
     
@@ -165,6 +167,8 @@ def update(ctx, generate_missing):
             comic = i[0]
             progress.update(update_comics_task, description=f"[red]Updating {comic.name}...")
             comic.chapters = get_chapters(output, comic, update=i[1])
+            if comic.volume_breakpoints == {}:
+                comic.volume_breakpoints = {comic.chapters[-1].slug: "1"}
             updated_catalog_list.append(comic)
             log.info(f"Updated '{comic.name}' in catalog.")
             progress.update(update_comics_task, advance=1)

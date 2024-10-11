@@ -8,6 +8,11 @@ class ComicStatus(Enum):
     HIATUS = 'hiatus'
     DROPPED = 'dropped'
 
+class BreakPointOperators(Enum):
+    ADD = 'add'
+    DELTE = 'delete'
+    MODIFY = 'modify'
+
 class Chapter:
     def __init__(self, name, id, slug, thumbnail_url, created_at=None):
         self.name = name
@@ -25,6 +30,27 @@ class Chapter:
         if os.path.exists(library / comic.name / f"{comic.name} Vol.01 Ch.{self.slug.split('-')[1]}.cbz"):
             return True
         return False
+
+    def is_breakpoint(self, comic) -> bool:
+        if self.slug in comic.volume_breakpoints.keys():
+            return True
+        return False
+
+    
+    def get_volume(self, comic) -> str:
+        """
+        Returns the volume a chapter belongs to in a comic.
+        """
+
+        current_volume = ""
+        for chapter in comic.chapters:
+            if chapter.is_breakpoint(comic):
+                current_volume = comic.volume_breakpoints[chapter.slug]
+
+            if chapter.slug == self.slug:
+                break
+        
+        return current_volume
 
 
     def encode(self) -> dict:
@@ -52,6 +78,19 @@ class Comic:
         self.is_subscribed:bool = False
         self.chapters:list[Chapter] = []
 
+        self.volume_breakpoints:dict = {}
+        # Stores a {chapter_slug:volume} pair that tells when a new volume starts.
+    
+    def breakpoint(self, operation:BreakPointOperators, chapter_slug:str, volume_name:str=None):
+        match operation:
+            case BreakPointOperators.ADD:
+                self.volume_breakpoints[chapter_slug] = volume_name
+            case BreakPointOperators.DELTE:
+                del self.volume_breakpoints[chapter_slug]
+            case BreakPointOperators.MODIFY:
+                self.volume_breakpoints[chapter_slug] = volume_name
+
+
     def encode(self) -> dict:
         _chapters = [chapter.encode() for chapter in self.chapters]
 
@@ -64,7 +103,8 @@ class Comic:
             "created_at": self.created_at,
             "thumbnail_url": self.thumbnail_url,
             "is_subscribed": self.is_subscribed,
-            "chapters": _chapters
+            "chapters": _chapters,
+            "volume_breakpoints": self.volume_breakpoints
         }
     
     def get_last_downloaded_chapter(self, library) -> Chapter:
@@ -100,6 +140,9 @@ def dict_to_comic(comic_dict:dict) -> Comic:
     if "chapters" in comic_dict:
         chapters = [dict_to_chapter(x) for x in comic_dict["chapters"]]
         comic_obj.chapters = chapters
+    
+    if "volume_breakpoints" in comic_dict:
+        comic_obj.volume_breakpoints = comic_dict["volume_breakpoints"]
 
     return comic_obj
 

@@ -1,3 +1,7 @@
+"""
+This is deprecated. Please make use of clickscript instead.
+"""
+
 import os
 import sys
 from pathlib import Path
