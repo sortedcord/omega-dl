@@ -1,6 +1,6 @@
 from enum import Enum
-from datetime import datetime
-import json
+from pathlib import Path
+import os
 
 class ComicStatus(Enum):
     ONGOING = 'ongoing'
@@ -9,14 +9,34 @@ class ComicStatus(Enum):
     DROPPED = 'dropped'
 
 class Chapter:
-    def __init__(self, name, id, slug, thumbnail_url, created_at):
+    def __init__(self, name, id, slug, thumbnail_url, created_at=None):
         self.name = name
         self.id = id
         self.slug = slug
         self.thumbnail_url = thumbnail_url
         self.created_at= created_at
 
+        if self.slug == "epilogue":
+            self.slug = "chapter-999"
+
         self.pages:list[str] = []
+    
+    def is_downloaded(self, comic,library:Path) -> bool:
+        if os.path.exists(library / comic.name / f"{comic.name} Vol.01 Ch.{self.slug.split('-')[1]}.cbz"):
+            return True
+        return False
+
+
+    def encode(self) -> dict:
+        return {
+            "name": self.name,
+            "id": self.id,
+            "slug": self.slug,
+            "thumbnail_url": self.thumbnail_url,
+            "created_at": self.created_at,
+            "pages": self.pages
+        }
+
 
 class Comic:
     def __init__(self, name:str, id:str, slug:str, status:ComicStatus, 
@@ -31,6 +51,27 @@ class Comic:
 
         self.is_subscribed:bool = False
         self.chapters:list[Chapter] = []
+
+    def encode(self) -> dict:
+        _chapters = [chapter.encode() for chapter in self.chapters]
+
+        return {
+            "name": self.name,
+            "id": self.id,
+            "slug": self.slug,
+            "status": self.status.name,
+            "updated_at": self.updated_at,
+            "created_at": self.created_at,
+            "thumbnail_url": self.thumbnail_url,
+            "is_subscribed": self.is_subscribed,
+            "chapters": _chapters
+        }
+    
+    def get_last_downloaded_chapter(self, library) -> Chapter:
+        for chapter in self.chapters:
+            if chapter.is_downloaded(self, library):
+                return chapter
+
 
 def dict_to_comic(comic_dict:dict) -> Comic:
     if "name" in comic_dict:
@@ -64,6 +105,7 @@ def dict_to_comic(comic_dict:dict) -> Comic:
 
 
 def dict_to_chapter(chapter_dict:dict) -> Chapter:
+    # print(chapter_dict)
 
     if "chapter_name" in chapter_dict:
         name = chapter_dict["chapter_name"]
@@ -77,9 +119,14 @@ def dict_to_chapter(chapter_dict:dict) -> Chapter:
 
     thumbnail_url = chapter_dict["chapter_thumbnail"] if "chapter_thumbnail" in chapter_dict else chapter_dict["thumbnail_url"]
 
-    chapter_obj = Chapter(id=chapter_dict["id"], name=name, thumbnail_url=thumbnail_url, slug=slug,created_at=chapter_dict["created_at"])
+    chapter_obj = Chapter(id=chapter_dict["id"], name=name, thumbnail_url=thumbnail_url, slug=slug)
+
+    if "created_at" in chapter_dict:
+        chapter_obj.created_at = chapter_dict["created_at"]
 
     if "pages" in chapter_dict:
         chapter_obj.pages = chapter_dict["pages"]
 
     return chapter_obj
+
+
