@@ -1,12 +1,17 @@
 from enum import Enum
 from pathlib import Path
 import os
+import json
+from dataclasses import dataclass, asdict
+
+from omegadl.utils import trailing_int
 
 class ComicStatus(Enum):
     ONGOING = 'ongoing'
     COMPLETED = 'completed'
     HIATUS = 'hiatus'
     DROPPED = 'dropped'
+
 
 class BreakPointOperators(Enum):
     ADD = 'add'
@@ -27,7 +32,7 @@ class Chapter:
         self.pages:list[str] = []
     
     def is_downloaded(self, comic,library:Path) -> bool:
-        if os.path.exists(library / comic.name / f"{comic.name} Vol.01 Ch.{self.slug.split('-')[1]}.cbz"):
+        if os.path.exists(library / comic.name / f"{comic.name} Vol.{self.get_volume(comic)} Ch.{self.slug.split('-')[1]}.cbz"):
             return True
         return False
 
@@ -42,15 +47,15 @@ class Chapter:
         Returns the volume a chapter belongs to in a comic.
         """
 
-        current_volume = ""
-        for chapter in comic.chapters:
+        current_volume = 1
+        for chapter in comic.chapters[::-1]:
             if chapter.is_breakpoint(comic):
                 current_volume = comic.volume_breakpoints[chapter.slug]
 
             if chapter.slug == self.slug:
                 break
         
-        return current_volume
+        return trailing_int(current_volume)
 
 
     def encode(self) -> dict:
@@ -66,14 +71,14 @@ class Chapter:
 
 class Comic:
     def __init__(self, name:str, id:str, slug:str, status:ComicStatus, 
-                 created_at:str, updated_at:str, thumbnail_url:str):
+                 created_at:str, updated_at:str, covers:dict):
         self.name = name
         self.id = id
         self.slug = slug
         self.status = status
         self.updated_at = updated_at
         self.created_at = created_at
-        self.thumbnail_url = thumbnail_url
+        self.covers = covers # {"volume":"url"}
 
         self.is_subscribed:bool = False
         self.chapters:list[Chapter] = []
@@ -89,6 +94,10 @@ class Comic:
                 del self.volume_breakpoints[chapter_slug]
             case BreakPointOperators.MODIFY:
                 self.volume_breakpoints[chapter_slug] = volume_name
+    
+    def get_cover(self, chapter:Chapter) -> str:
+        chapter_volume = chapter.get_volume(self)
+        return self.covers[chapter_volume]
 
 
     def encode(self) -> dict:
@@ -101,16 +110,63 @@ class Comic:
             "status": self.status.name,
             "updated_at": self.updated_at,
             "created_at": self.created_at,
-            "thumbnail_url": self.thumbnail_url,
+            "covers": self.covers,
             "is_subscribed": self.is_subscribed,
             "chapters": _chapters,
             "volume_breakpoints": self.volume_breakpoints
         }
     
+    def get_logo(self) -> str:
+        with open("logos.json", "r") as f:
+            logo_dict = json.loads(f.read())
+
+        if str(self.id) in logo_dict.keys():
+            return logo_dict[str(self.id)]
+
     def get_last_downloaded_chapter(self, library) -> Chapter:
         for chapter in self.chapters:
             if chapter.is_downloaded(self, library):
                 return chapter
+
+
+@dataclass
+class Config:
+    subscription_list: list[str] = None
+    library_path: Path = None
+    cache: bool = True
+    output_path: Path = None
+    overwrite_catalog: bool = True
+        
+
+    def load(self, output_dir:Path=None):
+        if output_dir is None:
+            output_dir = self.output_path
+            
+        with open(output_dir / "config.json", "r") as file:
+            config_dict = json.loads(file.read())
+
+        for key, value in config_dict.items():
+            if key.endswith("path"):
+                value = Path(value)
+            setattr(self, key, value)
+
+        return self
+    
+    def save(self, output_dir:Path=None):
+        if output_dir is None:
+            output_dir = self.output_path
+
+        attrs = dir(self)
+        for attr in attrs:
+            if attr.startswith('__'):
+                continue
+
+            if isinstance(getattr(self, attr), Path):
+                val:Path = getattr(self, attr).resolve()
+                setattr(self, attr, str(val))
+
+        with open(Path(output_dir) / "config.json", "w") as file:
+            file.write(json.dumps(asdict(self), indent=2))
 
 
 def dict_to_comic(comic_dict:dict) -> Comic:
@@ -129,13 +185,13 @@ def dict_to_comic(comic_dict:dict) -> Comic:
     updated_at = comic_dict["updated_at"]
     created_at = comic_dict["created_at"]
 
-    if "thumbnail_url" in comic_dict:
-        thumbnail_url = comic_dict["thumbnail_url"]
+    if "covers" in comic_dict:
+        covers = comic_dict["covers"]
     else:
-        thumbnail_url = comic_dict["thumbnail"]
+        covers = {"01": comic_dict["thumbnail"]}
     
     comic_obj = Comic(name=name, id=id, slug=slug, status=status, created_at=created_at, 
-                updated_at=updated_at, thumbnail_url=thumbnail_url)
+                updated_at=updated_at, covers=covers)
     
     if "chapters" in comic_dict:
         chapters = [dict_to_chapter(x) for x in comic_dict["chapters"]]
@@ -143,6 +199,8 @@ def dict_to_comic(comic_dict:dict) -> Comic:
     
     if "volume_breakpoints" in comic_dict:
         comic_obj.volume_breakpoints = comic_dict["volume_breakpoints"]
+        if comic_dict["volume_breakpoints"] == {}:
+            comic_obj.volume_breakpoints = {comic_obj.chapters[-1].slug: "1"}
 
     return comic_obj
 

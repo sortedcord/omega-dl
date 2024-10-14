@@ -1,5 +1,0 @@
-[project]
-name = "omegadl"
-version = "0.1"
-
-dependencies = ["requests==2.32.3","rich==13.9.2","click==8.1.7"]

@@ -1,5 +1,25 @@
-from omegadl.cli import cli
+import json
 import click
+import shutil
+import logging
+
+from rich.progress import Progress
+from rich.table import Table
+from rich.logging import RichHandler
+from rich.syntax import Syntax
+from rich.console import Console
+
+from catalog import load_catalog, search_comics
+from omegadl.objects import Comic, Config
+from omegadl.downloader import download_chapter
+from omegadl.cli import cli
+
+FORMAT = "%(message)s"
+logging.basicConfig(
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+)
+log = logging.getLogger("rich")
+console = Console()
 
 @cli.group()
 @click.pass_context
@@ -10,7 +30,7 @@ def comics(ctx, query):
     """
     ctx.obj["query"] = query
 
-def list_comics(catalog:list[Comic], library):
+def display_comics_as_table(catalog:list[Comic], library):
     table = Table(title="Indexed Comic Titles")
 
     table.add_column("Comic ID", justify="left", style="cyan", no_wrap=True)
@@ -41,33 +61,48 @@ def list_comics(catalog:list[Comic], library):
 
     console.print(table)
 
-@comics.command()
+@comics.command(name="list")
 @click.pass_context
-def list(ctx):
+def list_comics(ctx):
     """
     Search for comics. You can search via comic id or comic name.
     """
-    output = ctx.obj["output"]
-    query = ctx.obj["query"]
-    library = ctx.obj['library']
-
-    catalog,_ = load_catalog(output)
     
-    list_comics(search_comics(catalog, query), library)
+    config:Config = ctx.obj["config"]
+    query = ctx.obj["query"]
 
-@comics.command()
+    catalog,_ = load_catalog(config.output_path)
+    
+    display_comics_as_table(search_comics(catalog, query), config.library_path)
+
+@comics.command(name="json")
+@click.pass_context
+def view_comic_json(ctx):
+    """
+    View the json for a given comic.
+    """
+
+    query = ctx.obj["query"]
+    config:Config = ctx.obj["config"]
+
+    catalog,_ = load_catalog(config.output_path)
+    comic = search_comics(catalog, query)[0]
+
+    console.print(Syntax(json.dumps(comic.encode(), indent=2), "json"))
+
+
+@comics.command(name="download")
 @click.pass_context
 @click.option("--chapters", help="Specifiy the chapter slugs (separated by comma) you want to download. List Slicing works as well")
-def download(ctx, chapters=None):
+def download_comic(ctx, chapters=None):
     """
     Downloads the missing chapters of a comic. Requires the chapter(s) as an option.
     """
     chapters_query = chapters
-    output = ctx.obj["output"]
     query = ctx.obj["query"]
-    library = ctx.obj['library']
+    config:Config = ctx.obj["config"]
 
-    catalog,_ = load_catalog(output)
+    catalog,_ = load_catalog(config.output_path)
     comic = search_comics(catalog, query)[0]
 
     # Get chapters:
@@ -76,7 +111,7 @@ def download(ctx, chapters=None):
     # Fetch Missing Chapters
     if chapters_query is None:
         for chapter in comic.chapters:
-            if not chapter.is_downloaded(comic, library):
+            if not chapter.is_downloaded(comic, config.library_path):
                 download_queue.append(chapter)
 
 
@@ -101,12 +136,20 @@ def download(ctx, chapters=None):
                     if chapter.slug == range:
                         download_queue.append(chapter)
     
+    progress_total = 0
+    for chapter in download_queue:
+        progress_total += 3
+        progress_total += len(chapter.pages)
+    
     with Progress() as progress:
-        download_chapter_task = progress.add_task("[red]Downloading Chapters...", total=len(download_queue))
+        download_chapter_task = progress.add_task("[red]Downloading Chapters...", total=progress_total)
 
         for i,chapter in enumerate(download_queue):
             progress.update(download_chapter_task, 
-                            description=f"[red][{i}/{len(download_queue)}] Downloading {chapter.name} - {comic.name[0:40]}...")
-            download_chapter(comic, chapter, output, library)
-            log.info(f"Downloaded {chapter.name} - {comic.name[0:40]}...")
-            progress.update(download_chapter_task, advance=1)
+                            description=f"[green]Downloading {chapter.name} - {comic.name[0:40]}...")
+            if chapter.pages == []:
+                log.error(f"No pages found for '{chapter.name} - {comic.name[0:40]}' It might need repairing in the catalog.")
+                continue
+            download_chapter(comic, chapter, config.output_path, config.library_path, progress, download_chapter_task)
+        progress.remove_task(download_chapter_task)
+    shutil.rmtree(config.output_path/"comics"/comic.slug)

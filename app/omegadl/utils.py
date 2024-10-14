@@ -42,6 +42,13 @@ def slugify(value, allow_unicode=False):
     return re.sub(r'[-\s]+', '-', value).strip('-_')
 
 
+def trailing_int(x) ->str:
+    if int(x) < 10:
+        return f"0{int(x)}"
+    else:
+        return str(int(x))
+
+
 def zip_files(file_paths, output_zip_file):
     """
     Zip the given files into a single zip file.
