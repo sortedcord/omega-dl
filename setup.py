@@ -25,5 +25,10 @@ setup(
         "pillow>=10.4.0", 
         "numpy>=2.1.2"
     ],
+    entry_points={
+        'console_scripts': [
+            'omegadl = omegadl.cli:cli',
+        ],
+    },
     python_required=">=3.10"
 )

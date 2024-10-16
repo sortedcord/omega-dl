@@ -2,11 +2,11 @@ import requests
 import json
 import random
 import os
-from utils import slugify
+from omegadl.utils import slugify
 from pathlib import Path
 import logging
 from rich.logging import RichHandler
-from objects import Comic, dict_to_chapter, dict_to_comic, Chapter
+from omegadl.objects import Comic, dict_to_chapter, dict_to_comic, Chapter
 
 
 FORMAT = "%(message)s"

@@ -9,10 +9,9 @@ from rich.logging import RichHandler
 from rich.syntax import Syntax
 from rich.console import Console
 
-from catalog import load_catalog, search_comics
+from omegadl.catalog import load_catalog, search_comics
 from omegadl.objects import Comic, Config
 from omegadl.downloader import download_chapter
-from omegadl.cli import cli
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -21,7 +20,7 @@ logging.basicConfig(
 log = logging.getLogger("rich")
 console = Console()
 
-@cli.group()
+@click.group()
 @click.pass_context
 @click.argument("query")
 def comics(ctx, query):

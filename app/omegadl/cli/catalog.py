@@ -9,7 +9,6 @@ from rich.progress import Progress
 from omegadl.catalog import load_catalog, dump_catalog, get_comic_by_id
 from omegadl.fetch import get_comic_list, get_chapters, update_comic_metadata
 from omegadl.objects import Comic, ComicStatus, Config
-from omegadl.cli import cli
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -19,7 +18,7 @@ log = logging.getLogger("rich")
 console = Console()
 
 
-@cli.group()
+@click.group()
 @click.pass_context
 def catalog(ctx):
     """
@@ -40,6 +39,7 @@ def show_catalog_info(ctx):
 
     click.echo(f"Catalog last synced at: {sync_time}")
     click.echo(f"Indexed {len(catalog)} titles.")
+
 
 @catalog.command(name="generate")
 @click.pass_context
@@ -80,7 +80,7 @@ def generate_catalog(ctx, disable_overwrite:bool):
 @catalog.command(name="update")
 @click.pass_context
 @click.option("--generate", help="Generate a new config if it does not exist", is_flag=True)
-def update_catalog(ctx, generate_missing):
+def update_catalog(ctx, generate):
     """
     Selectively updates parts of the comic catalog if it already exists.
     """
@@ -88,7 +88,7 @@ def update_catalog(ctx, generate_missing):
     catalog_path = config.output_path / "catalog.json"
 
     if not os.path.exists(catalog_path):
-        if generate_missing:
+        if generate:
             generate_catalog(ctx)
         else:
             log.error(f"Catalog cannot be found at {catalog_path}. Exiting...")

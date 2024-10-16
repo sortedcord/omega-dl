@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-from objects import Comic, dict_to_comic, ComicStatus
+from omegadl.objects import Comic, dict_to_comic, ComicStatus
 
 
 # TODO: Use catalog as an object

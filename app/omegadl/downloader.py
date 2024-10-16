@@ -1,9 +1,9 @@
 import requests
 from pathlib import Path
 import os
-from utils import zip_files, list_files_abs
-from objects import Comic, Chapter
-from comicxml import ComicInfo, Manga, AgeRating, create_comic_info_xml
+from omegadl.utils import zip_files, list_files_abs
+from omegadl.objects import Comic, Chapter
+from omegadl.comicxml import ComicInfo, Manga, AgeRating, create_comic_info_xml
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageFilter, ImageEnhance, ImageDraw, ImageFont
 import numpy as np

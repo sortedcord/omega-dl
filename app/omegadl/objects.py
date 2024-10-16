@@ -32,7 +32,9 @@ class Chapter:
         self.pages:list[str] = []
     
     def is_downloaded(self, comic,library:Path) -> bool:
-        if os.path.exists(library / comic.name / f"{comic.name} Vol.{self.get_volume(comic)} Ch.{self.slug.split('-')[1]}.cbz"):
+
+        vol = self.get_volume(comic)
+        if os.path.exists(library / comic.name / f"{comic.name} Vol.{vol} Ch.{self.slug.split('-')[1]}.cbz"):
             return True
         return False
 
@@ -206,7 +208,6 @@ def dict_to_comic(comic_dict:dict) -> Comic:
 
 
 def dict_to_chapter(chapter_dict:dict) -> Chapter:
-    # print(chapter_dict)
 
     if "chapter_name" in chapter_dict:
         name = chapter_dict["chapter_name"]

@@ -8,6 +8,8 @@ from rich.logging import RichHandler
 from rich.console import Console
 
 from omegadl.objects import Config
+from omegadl.cli.catalog import catalog
+from omegadl.cli.comics import comics
 
 
 FORMAT = "%(message)s"
@@ -90,3 +92,6 @@ def display_version():
     """
     click.echo(f"omegadl Version 0.1")
     click.echo(f"View project on Github: https://github.com/sortedcord/omegadl")
+
+cli.add_command(catalog)
+cli.add_command(comics)
