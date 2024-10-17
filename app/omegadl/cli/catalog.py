@@ -80,10 +80,11 @@ def generate_catalog(ctx, disable_overwrite:bool):
 @catalog.command(name="update")
 @click.pass_context
 @click.option("--generate", help="Generate a new config if it does not exist", is_flag=True)
-def update_catalog(ctx, generate):
+def update_catalog_command(ctx, generate):
     """
     Selectively updates parts of the comic catalog if it already exists.
     """
+    
     config:Config = ctx.obj["config"]
     catalog_path = config.output_path / "catalog.json"
 
@@ -94,6 +95,13 @@ def update_catalog(ctx, generate):
             log.error(f"Catalog cannot be found at {catalog_path}. Exiting...")
         return
     
+    update_catalog(config)
+
+
+
+def update_catalog(config:Config, filter_list:list[int]=None) -> list[Comic]:
+    # filter_list is a list of comic IDs that you can use to selectively update comics.
+    # Mainly used for quick updating subscription list titles. Leave none to include all.    
     origin_catalog,_ = load_catalog(config.output_path)
 
     with console.status("[bold green]Fetching comic list...") as status:
@@ -111,11 +119,15 @@ def update_catalog(ctx, generate):
     with console.status("[bold green]Comparing local and remote catalog...") as status:
         for remote_comic in remote_catalog:
             local_comic = get_comic_by_id(origin_catalog, remote_comic.id)
-
+                
             if local_comic is None:
                 log.debug(f"{remote_comic.name} not present in local catalog. Adding to fetch list.")
                 process_queue.append((remote_comic, False))
                 continue
+
+            if filter_list is not None:
+                if remote_comic.id not in filter_list:
+                    continue
 
             local_comic:Comic = update_comic_metadata(local_comic, remote_comic)
 
@@ -133,8 +145,18 @@ def update_catalog(ctx, generate):
             else:
                 # If the comic doesn't need to be updated
                 updated_catalog_list.append(local_comic)
-
     
+    # Remove comics from process_queue if not in filter_list (if specified)
+    _process_queue = process_queue
+    if filter_list is not None:
+        for i in _process_queue:
+            print("HELLO")
+            _comic = i[0]
+            if _comic.id not in filter_list:
+                updated_catalog_list.append(_comic)
+                process_queue.remove(i)
+
+
     with Progress() as progress:
         update_comics_task = progress.add_task("[red]Downloading Comics...", total=len(process_queue))
 
@@ -149,3 +171,7 @@ def update_catalog(ctx, generate):
             progress.update(update_comics_task, advance=1)
 
     dump_catalog(config.output_path, updated_catalog_list)
+
+    return updated_catalog_list
+
+

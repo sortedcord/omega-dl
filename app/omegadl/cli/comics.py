@@ -29,7 +29,7 @@ def comics(ctx, query):
     """
     ctx.obj["query"] = query
 
-def display_comics_as_table(catalog:list[Comic], library):
+def display_comics_as_table(catalog:list[Comic], config:Config):
     table = Table(title="Indexed Comic Titles")
 
     table.add_column("Comic ID", justify="left", style="cyan", no_wrap=True)
@@ -43,7 +43,7 @@ def display_comics_as_table(catalog:list[Comic], library):
         if comic is None:
             continue
 
-        last_downloaded_chapter = comic.get_last_downloaded_chapter(library)
+        last_downloaded_chapter = comic.get_last_downloaded_chapter(config.library_path)
 
         latest_chapter = comic.chapters[0].name
 
@@ -56,7 +56,7 @@ def display_comics_as_table(catalog:list[Comic], library):
             last_downloaded_chapter = "[green][bold]Up-to-date[/bold][/green]"
 
         table.add_row(str(comic.id), comic.name[0:70], comic.status.name, 
-                      str(comic.is_subscribed), latest_chapter, last_downloaded_chapter)
+                      str(comic.is_subscribed(config)), latest_chapter, last_downloaded_chapter)
 
     console.print(table)
 
@@ -72,7 +72,7 @@ def list_comics(ctx):
 
     catalog,_ = load_catalog(config.output_path)
     
-    display_comics_as_table(search_comics(catalog, query), config.library_path)
+    display_comics_as_table(search_comics(catalog, query), config)
 
 @comics.command(name="json")
 @click.pass_context
@@ -90,6 +90,7 @@ def view_comic_json(ctx):
     console.print(Syntax(json.dumps(comic.encode(), indent=2), "json"))
 
 
+# TODO: Implement for multiple comics
 @comics.command(name="download")
 @click.pass_context
 @click.option("--chapters", help="Specifiy the chapter slugs (separated by comma) you want to download. List Slicing works as well")
@@ -152,3 +153,44 @@ def download_comic(ctx, chapters=None):
             download_chapter(comic, chapter, config.output_path, config.library_path, progress, download_chapter_task)
         progress.remove_task(download_chapter_task)
     shutil.rmtree(config.output_path/"comics"/comic.slug)
+
+
+@comics.command(name="add")
+@click.pass_context
+def add_comic_to_subscription(ctx):
+    query = ctx.obj["query"]
+    config:Config = ctx.obj["config"]
+
+    catalog,_ = load_catalog(config.output_path)
+    comics = search_comics(catalog, query)
+
+    if config.subscription_list is None:
+        config.subscription_list = []
+
+    for comic in comics:
+        if comic.id not in config.subscription_list:
+            config.subscription_list.append(comic.id)
+
+    config.save()
+    log.info(f"Added {len(comics)} comic(s) to subscription list.")
+
+
+@comics.command(name="remove")
+@click.pass_context
+def remove_comic_from_subscription(ctx):
+    query = ctx.obj["query"]
+    config:Config = ctx.obj["config"]
+
+    catalog,_ = load_catalog(config.output_path)
+    comics = search_comics(catalog, query)
+
+    if config.subscription_list is None:
+        config.subscription_list = []
+
+    for comic in comics:
+        if comic.id not in config.subscription_list:
+            config.subscription_list.remove(comic.id)
+
+    config.save()
+    log.info(f"Added {len(comics)} comic(s) to subscription list.")
+

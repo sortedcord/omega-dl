@@ -8,6 +8,9 @@ import logging
 from rich.logging import RichHandler
 from omegadl.objects import Comic, dict_to_chapter, dict_to_comic, Chapter
 
+from omegadl.objects import BreakPointOperators
+from omegadl.utils import trailing_int
+
 
 FORMAT = "%(message)s"
 logging.basicConfig(
@@ -60,9 +63,20 @@ def generate_random_headers():
     }
 
 
+# FIXME: Preserve covers and volume_breakpoints
 def update_comic_metadata(local:Comic, remote:Comic) -> Comic:
     chapters = local.chapters
     remote.chapters = chapters
+
+    remote.volume_breakpoints = local.volume_breakpoints
+    
+    remote_cover = list(remote.covers.values())[0]
+
+    if remote_cover not in local.covers.values():
+        new_volume = trailing_int(max([int(x) for x in remote.volume_breakpoints.values()])+1)
+        remote.breakpoint(BreakPointOperators.ADD, remote.chapters[0].slug, new_volume)
+        remote.covers[new_volume] = remote_cover
+
     return remote
 
 

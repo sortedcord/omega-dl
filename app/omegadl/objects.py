@@ -6,6 +6,9 @@ from dataclasses import dataclass, asdict
 
 from omegadl.utils import trailing_int
 
+# Implement a modularized task processor.
+
+
 class ComicStatus(Enum):
     ONGOING = 'ongoing'
     COMPLETED = 'completed'
@@ -30,7 +33,8 @@ class Chapter:
             self.slug = "chapter-999"
 
         self.pages:list[str] = []
-    
+
+
     def is_downloaded(self, comic,library:Path) -> bool:
 
         vol = self.get_volume(comic)
@@ -82,11 +86,17 @@ class Comic:
         self.created_at = created_at
         self.covers = covers # {"volume":"url"}
 
-        self.is_subscribed:bool = False
         self.chapters:list[Chapter] = []
 
         self.volume_breakpoints:dict = {}
         # Stores a {chapter_slug:volume} pair that tells when a new volume starts.
+    
+    def is_subscribed(self, config) -> bool:
+        if config.subscription_list is None:
+            return False
+        if self.id in config.subscription_list:
+            return True
+        return False
     
     def breakpoint(self, operation:BreakPointOperators, chapter_slug:str, volume_name:str=None):
         match operation:
@@ -113,7 +123,6 @@ class Comic:
             "updated_at": self.updated_at,
             "created_at": self.created_at,
             "covers": self.covers,
-            "is_subscribed": self.is_subscribed,
             "chapters": _chapters,
             "volume_breakpoints": self.volume_breakpoints
         }
@@ -151,6 +160,7 @@ class Config:
             if key.endswith("path"):
                 value = Path(value)
             setattr(self, key, value)
+
 
         return self
     

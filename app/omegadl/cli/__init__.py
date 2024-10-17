@@ -7,9 +7,10 @@ import logging
 from rich.logging import RichHandler
 from rich.console import Console
 
-from omegadl.objects import Config
-from omegadl.cli.catalog import catalog
+from omegadl.objects import Config, Chapter
+from omegadl.cli.catalog import catalog, update_catalog
 from omegadl.cli.comics import comics
+from omegadl.catalog import load_catalog
 
 
 FORMAT = "%(message)s"
@@ -92,6 +93,49 @@ def display_version():
     """
     click.echo(f"omegadl Version 0.1")
     click.echo(f"View project on Github: https://github.com/sortedcord/omegadl")
+
+
+
+@cli.command(name="pull")
+@click.option("--y", help="Automatically accept the list of downloads and start downloading", is_flag=True)
+@click.pass_context
+def fetch_subscribed_comics(ctx, y:bool=False):
+    """
+    Update the catalog for all titles in the subscribed list present in the 
+    config file and then download only the missing chapters from those comics.
+
+    Add/Remove comic(s) from subscription list using `omegadl comics "query" add/remove`
+    """
+
+    config:Config = ctx.obj["config"]
+
+    # Update catalog
+    catalog = update_catalog(config=config, filter_list=config.subscription_list)
+
+    # Download missing chapters.
+    download_queue:list[Chapter] = []
+    _size = 0
+    for comic in catalog:
+        if comic.id not in config.subscription_list:
+            continue
+
+        _chapter_list = []
+        for chapter in comic.chapters:
+            if not chapter.is_downloaded(comic, config.library_path):
+                _chapter_list.append(chapter)
+        
+        if _chapter_list:
+            size = sum([len(x.pages) for x in _chapter_list])*4
+            _size += size
+            print(comic.name[:45], f"({size}) MB" , "\n")
+            for __chapter in _chapter_list:
+                print(__chapter.name)
+    
+    if not y:
+        print(f"This operation may take as much as {_size} MBs of storage.")
+        _inp = input("Would you like to proceed (y/n): ")
+        if _inp != "y":
+            return
 
 cli.add_command(catalog)
 cli.add_command(comics)
