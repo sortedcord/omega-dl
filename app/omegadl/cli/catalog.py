@@ -125,10 +125,6 @@ def update_catalog(config:Config, filter_list:list[int]=None) -> list[Comic]:
                 process_queue.append((remote_comic, False))
                 continue
 
-            if filter_list is not None:
-                if remote_comic.id not in filter_list:
-                    continue
-
             local_comic:Comic = update_comic_metadata(local_comic, remote_comic)
 
             if local_comic.status == ComicStatus.ONGOING and remote_comic.status == ComicStatus.ONGOING:
@@ -145,17 +141,20 @@ def update_catalog(config:Config, filter_list:list[int]=None) -> list[Comic]:
             else:
                 # If the comic doesn't need to be updated
                 updated_catalog_list.append(local_comic)
+
+    print(len(process_queue))
+    non_sub_list: list[Comic] = []
     
     # Remove comics from process_queue if not in filter_list (if specified)
-    _process_queue = process_queue
     if filter_list is not None:
-        for i in _process_queue:
-            print("HELLO")
+        for i in process_queue:
             _comic = i[0]
             if _comic.id not in filter_list:
-                updated_catalog_list.append(_comic)
-                process_queue.remove(i)
+                non_sub_list.append(i)
 
+        for i in non_sub_list:
+            process_queue.remove(i)
+            updated_catalog_list.append(i[0])
 
     with Progress() as progress:
         update_comics_task = progress.add_task("[red]Downloading Comics...", total=len(process_queue))

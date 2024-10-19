@@ -9,7 +9,7 @@ from rich.console import Console
 
 from omegadl.objects import Config, Chapter
 from omegadl.cli.catalog import catalog, update_catalog
-from omegadl.cli.comics import comics
+from omegadl.cli.comics import comics, download_missing_chapters
 from omegadl.catalog import load_catalog
 
 
@@ -112,30 +112,42 @@ def fetch_subscribed_comics(ctx, y:bool=False):
     # Update catalog
     catalog = update_catalog(config=config, filter_list=config.subscription_list)
 
+
     # Download missing chapters.
     download_queue:list[Chapter] = []
     _size = 0
     for comic in catalog:
         if comic.id not in config.subscription_list:
             continue
-
+        
+        to_download = False
         _chapter_list = []
         for chapter in comic.chapters:
             if not chapter.is_downloaded(comic, config.library_path):
                 _chapter_list.append(chapter)
+                to_download = True
         
         if _chapter_list:
             size = sum([len(x.pages) for x in _chapter_list])*4
             _size += size
-            print(comic.name[:45], f"({size}) MB" , "\n")
+            print("\n", comic.name[:45], f"({size}) MB" )
             for __chapter in _chapter_list:
                 print(__chapter.name)
+        
+        if to_download and comic not in download_queue:
+            download_queue.append(comic)
     
     if not y:
         print(f"This operation may take as much as {_size} MBs of storage.")
         _inp = input("Would you like to proceed (y/n): ")
         if _inp != "y":
             return
+    
+    for comic in download_queue:
+        download_missing_chapters(config, comic)
+    
+    
+    
 
 cli.add_command(catalog)
 cli.add_command(comics)

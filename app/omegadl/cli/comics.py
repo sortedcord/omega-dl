@@ -45,7 +45,10 @@ def display_comics_as_table(catalog:list[Comic], config:Config):
 
         last_downloaded_chapter = comic.get_last_downloaded_chapter(config.library_path)
 
-        latest_chapter = comic.chapters[0].name
+        try:
+            latest_chapter = comic.chapters[0].name
+        except IndexError:
+            latest_chapter = "chapter-1"
 
         if last_downloaded_chapter is None:
             last_downloaded_chapter = "[red]Not downloaded[/red]"
@@ -91,6 +94,40 @@ def view_comic_json(ctx):
 
 
 # TODO: Implement for multiple comics
+def download_missing_chapters(config, comic:Comic=None):
+    """
+    Downloads the missing chapters of a comic. Requires the chapter(s) as an option.
+    """
+
+    catalog,_ = load_catalog(config.output_path)
+
+    # Get chapters:
+    download_queue = []
+
+    # Fetch Missing Chapters
+    for chapter in comic.chapters:
+        if not chapter.is_downloaded(comic, config.library_path):
+            download_queue.append(chapter)
+
+    progress_total = 0
+    for chapter in download_queue:
+        progress_total += 3
+        progress_total += len(chapter.pages)
+    
+    with Progress() as progress:
+        download_chapter_task = progress.add_task("[red]Downloading Chapters...", total=progress_total)
+
+        for i,chapter in enumerate(download_queue):
+            progress.update(download_chapter_task, 
+                            description=f"[green]Downloading {chapter.name} - {comic.name[0:40]}...")
+            if chapter.pages == []:
+                log.error(f"No pages found for '{chapter.name} - {comic.name[0:40]}' It might need repairing in the catalog.")
+                continue
+            download_chapter(comic, chapter, config.output_path, config.library_path, progress, download_chapter_task)
+        progress.remove_task(download_chapter_task)
+    shutil.rmtree(config.output_path/"comics"/comic.slug)
+
+
 @comics.command(name="download")
 @click.pass_context
 @click.option("--chapters", help="Specifiy the chapter slugs (separated by comma) you want to download. List Slicing works as well")
@@ -154,7 +191,7 @@ def download_comic(ctx, chapters=None):
         progress.remove_task(download_chapter_task)
     shutil.rmtree(config.output_path/"comics"/comic.slug)
 
-
+# FIXME: Fix for multiple queries
 @comics.command(name="add")
 @click.pass_context
 def add_comic_to_subscription(ctx):

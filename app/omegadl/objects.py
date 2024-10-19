@@ -202,7 +202,7 @@ def dict_to_comic(comic_dict:dict) -> Comic:
     else:
         covers = {"01": comic_dict["thumbnail"]}
     
-    comic_obj = Comic(name=name, id=id, slug=slug, status=status, created_at=created_at, 
+    comic_obj:Comic = Comic(name=name, id=id, slug=slug, status=status, created_at=created_at, 
                 updated_at=updated_at, covers=covers)
     
     if "chapters" in comic_dict:
@@ -212,7 +212,7 @@ def dict_to_comic(comic_dict:dict) -> Comic:
     if "volume_breakpoints" in comic_dict:
         comic_obj.volume_breakpoints = comic_dict["volume_breakpoints"]
         if comic_dict["volume_breakpoints"] == {}:
-            comic_obj.volume_breakpoints = {comic_obj.chapters[-1].slug: "1"}
+             comic_obj.volume_breakpoints = {"chapter-1": "01"}
 
     return comic_obj
 
