@@ -70,6 +70,8 @@ def reset_config(ctx):
     log.info(f"Config defaults saved at {config.output_path}/config.json")
 
 
+# Add an option "full delete" that deletes logos and other static files
+# Prevent deletion of covers and logos.
 @cli.command()
 @click.pass_context
 def clear_cache(ctx):

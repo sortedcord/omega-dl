@@ -41,6 +41,7 @@ def show_catalog_info(ctx):
     click.echo(f"Indexed {len(catalog)} titles.")
 
 
+# TODO: Add an option to source catalog from somehwere else.
 @catalog.command(name="generate")
 @click.pass_context
 @click.option("--disable-overwrite", help="Do not generate a new catalog if it already exists.", is_flag=True)
