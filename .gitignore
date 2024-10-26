@@ -1,6 +1,9 @@
 # Output
 mdlout/
 
+# Files I use for managing git and uploads.
+publish/
+
 # General
 .DS_Store
 .AppleDouble

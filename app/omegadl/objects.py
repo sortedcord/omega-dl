@@ -147,6 +147,7 @@ class Config:
     cache: bool = True
     output_path: Path = None
     overwrite_catalog: bool = True
+    download_reverse_order: bool = True
         
 
     def load(self, output_dir:Path=None):
