@@ -139,6 +139,10 @@ def fetch_subscribed_comics(ctx, y:bool=False):
         if to_download and comic not in download_queue:
             download_queue.append(comic)
     
+    if len(download_queue) == 0:
+        print("Nothing to download. Library is up-to-date.")
+        return
+    
     if not y:
         print(f"This operation may take as much as {_size} MBs of storage.")
         _inp = input("Would you like to proceed (y/n): ")
