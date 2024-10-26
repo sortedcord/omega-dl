@@ -94,7 +94,7 @@ def view_comic_json(ctx):
 
 
 # TODO: Implement for multiple comics
-def download_missing_chapters(config, comic:Comic=None):
+def download_missing_chapters(config:Config, comic:Comic=None):
     """
     Downloads the missing chapters of a comic. Requires the chapter(s) as an option.
     """
@@ -116,6 +116,9 @@ def download_missing_chapters(config, comic:Comic=None):
     
     with Progress() as progress:
         download_chapter_task = progress.add_task("[red]Downloading Chapters...", total=progress_total)
+
+        if not config.download_reverse_order:
+            download_queue = download_queue[::-1]
 
         for i,chapter in enumerate(download_queue):
             progress.update(download_chapter_task, 
@@ -177,6 +180,9 @@ def download_comic(ctx, chapters=None):
     for chapter in download_queue:
         progress_total += 3
         progress_total += len(chapter.pages)
+    
+    if not config.download_reverse_order:
+            download_queue = download_queue[::-1]
     
     with Progress() as progress:
         download_chapter_task = progress.add_task("[red]Downloading Chapters...", total=progress_total)
