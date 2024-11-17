@@ -76,7 +76,12 @@ def update_comic_metadata(local:Comic, remote:Comic) -> Comic:
     remote_cover = list(remote.covers.values())[0]
     if remote_cover not in local.covers.values():
         new_volume = trailing_int(max([int(x) for x in remote.volume_breakpoints.values()])+1)
-        remote.breakpoint(BreakPointOperators.ADD, remote.chapters[0].slug, new_volume)
+        try:
+            remote.breakpoint(BreakPointOperators.ADD, remote.chapters[0].slug, new_volume)
+        except IndexError:
+            log.error(f"{remote.name} is having breakpoint issues")
+            remote.covers = covers
+            return remote
         remote.covers = covers
         remote.covers[new_volume] = remote_cover
     else:
